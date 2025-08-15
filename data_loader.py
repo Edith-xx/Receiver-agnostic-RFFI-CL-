@@ -3,7 +3,6 @@ from sklearn.model_selection import train_test_split
 import torch
 import torch
 from numpy.random import standard_normal, uniform, randint
-
 def awgn(x):
     if isinstance(x, np.ndarray):
         x = torch.tensor(x)
@@ -27,7 +26,6 @@ def awgn(x):
         npower_imag.view(batch_size, 1))
     x_awgn[:, 1, :] = x_imag + noise_imag
     return x_awgn
-
 def normalization(data):
     data = torch.tensor(data)
     magnitude = torch.sqrt(data[:, 0, :] ** 2 + data[:, 1, :] ** 2)  # [batch, N]
@@ -36,30 +34,25 @@ def normalization(data):
     data[:, 0, :] = data[:, 0, :] / max_magnitude
     data[:, 1, :] = data[:, 1, :] / max_magnitude
     return data
-
 def apply_random_mask(data, mask_ratio=0.2):
     num_samples, num_channels, num_features = data.shape
     mask = np.random.rand(num_samples, num_channels, num_features) > mask_ratio
     masked_data = data * mask
     return masked_data
-
 class LoadDataset():
     def __init__(self):
         self.dataset_name = ' data'
         self.labelset_name = 'label'
-
     def load_stft_data(self, data_path):
         loaded = np.load(data_path, allow_pickle=True)
-        # .npz 返回 NpzFile，需要指定 key；默认取第一个数组
         if isinstance(loaded, np.lib.npyio.NpzFile):
             data = loaded[loaded.files[0]]
-        else:                               # .npy 直接是 ndarray
+        else:                           
             data = loaded
-        data = data.transpose(0, 2, 1)  # 讲数据转换为[1200, 2, 256]
+        data = data.transpose(0, 2, 1) 
         #data = awgn(data)
         #data = apply_random_mask(data, mask_ratio=0.10)
         return data
-
     def load_labels(self, label_path, dev_range):
         label = np.load(label_path)
         label = label.astype(int)
@@ -74,14 +67,11 @@ class LoadDataset():
             print('Dev ' + str(dev_idx + 1) + ' have ' + str(num_pkt) + ' packets.')
         label = label[sample_index_list]
         return label
-
-
-
 def read_train_data(file_path, file_label, dev_range=np.arange(0, 6, dtype=int),
-                    label_path='D:/work/data/paper6data/day1equalized/FFT/label_200.npy'):
+                    label_path='D:/work/data/day1equalized/FFT/label_200.npy'):
     data_stft_all = []
     y_all = []
-    label_all = []  # 用于存储文件标签
+    label_all = [] 
     LoadDatasetObj = LoadDataset()
     data_ch0 = LoadDatasetObj.load_stft_data(file_path)
     y_ch0 = LoadDatasetObj.load_labels(label_path, dev_range)
@@ -95,10 +85,8 @@ def read_train_data(file_path, file_label, dev_range=np.arange(0, 6, dtype=int),
     X_train, X_val, Y_train, Y_val, label_train, label_val = train_test_split(
         data_stft_all, y_all, label_all, test_size=0.2, random_state=32, shuffle=True)
     return X_train, X_val, Y_train, Y_val, label_train, label_val
-
-
-def read_test_data(data_path='D:/work/data/paper6data/day1equalized/IQ/200/Rx11_12.npy',
-                   label_path='D:/work/data/paper6data/day1equalized/FFT/label_400.npy',
+def read_test_data(data_path='D:/work/data/day1equalized/IQ/200/Rx11_12.npy',
+                   label_path='D:/work/data/day1equalized/FFT/label_400.npy',
                    dev_range=np.arange(0, 6, dtype=int),
                    test_size=0.2, random_state=42):
     data_stft_all = []
@@ -114,10 +102,10 @@ def read_test_data(data_path='D:/work/data/paper6data/day1equalized/IQ/200/Rx11_
     data_stft_all = np.concatenate(data_stft_all, axis=0)
     y_all = np.concatenate(y_all)
     return data_stft_all, y_all
-
 def main():
     X_train, X_val, Y_train, Y_val, label_train, label_val = read_train_data()
     print(X_train.shape)
+
 
 
 
