@@ -1,4 +1,3 @@
-# 按照DIFEX方法性能不高，只保留CORAL loss的时候，性能才能达到90%以上
 import argparse
 import torch
 import time
@@ -21,23 +20,17 @@ import datetime
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-
-
-
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 timestape = datetime.datetime.now().strftime('%Y%m%d%H%M')
-
-
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)  # CPU
     torch.cuda.manual_seed(seed)  # GPU
     torch.cuda.manual_seed_all(seed)  # All GPU
-    os.environ['PYTHONHASHSEED'] = str(seed)  # 设置pytorch内置hash函数种子，保证不同运行环境下字典等数据结构的哈希结果一致
-    torch.backends.cudnn.deterministic = True  # 确保每次返回的卷积算法是确定的
-    torch.backends.cudnn.benchmark = False  # True的话会自动寻找最适合当前配置的高效算法，来达到优化运行效率的问题。False禁用
-
+    os.environ['PYTHONHASHSEED'] = str(seed)  
+    torch.backends.cudnn.deterministic = True  
+    torch.backends.cudnn.benchmark = False 
 def parse_args():
     parser = argparse.ArgumentParser(description="CORAL")
     parser.add_argument('--lam', type=float, default=0.05, help='lam')
@@ -79,7 +72,6 @@ class Config:
         self.rand_num = rand_num
         self.train_lossses = []
         self.val_accuracies = []
-
 def coral(x, y):
     mean_x = x.mean(0, keepdim=True)
     mean_y = y.mean(0, keepdim=True)
@@ -99,7 +91,6 @@ def train(model, train_dataloader, optimizer, epoch, writer, device_num, logger)
     correct = 0
     conf = parse_args()
     lam = conf.lam
-
     for data_nnl in train_dataloader:
         data, target, index = data_nnl
         target = target.squeeze().long()
@@ -116,8 +107,8 @@ def train(model, train_dataloader, optimizer, epoch, writer, device_num, logger)
             complex_data = torch.complex(real_part, imag_part)
             data1 = torch.angle(torch.fft.fft(complex_data, dim=(1)))
             data1 = data1.unsqueeze(1)
-            tfeatures, toutput = tmodel(data1)  # 这里不计算梯度
-        loss2 = F.mse_loss(features[:, :256], tfeatures)*lam   # 主干网络提取的域内不变特征
+            tfeatures, toutput = tmodel(data1)  
+        loss2 = F.mse_loss(features[:, :256], tfeatures)*lam   
         #loss3 = F.mse_loss(features[:, :256], features[:, 256:])*0.001
         loss4 = 0
         B = 32
@@ -127,15 +118,13 @@ def train(model, train_dataloader, optimizer, epoch, writer, device_num, logger)
         loss4 = beta * (loss4 * 2) / (10 * 9)
         loss1 = classifier_loss_batch
         total_loss = (loss1 + loss2 + loss4 ) / (1 + beta + lam)
-        #total_loss = (loss1 + loss2 ) / (1 + lam)#只有F1
-        #total_loss = (loss1 + loss4 ) / (1 + beta)#只有F2
         total_loss.backward()
         optimizer.step()
         total_loss += total_loss.item()
         pred = classifier_output.argmax(dim=1, keepdim=True)
         correct += pred.eq(target.view_as(pred)).sum().item()
-    mean_loss = total_loss / len(train_dataloader)  # len(t1)表示t1数据集的批次数量
-    mean_accuracy = 100 * correct / len(train_dataloader.dataset)  # 所有样本中预测正确的数量除以总的样本个数
+    mean_loss = total_loss / len(train_dataloader) 
+    mean_accuracy = 100 * correct / len(train_dataloader.dataset)  
     logger.info(
         'Train Epoch: {} \tLoss: {:.6f}, Accuracy: {}/{} ({:0f}%)\n'.format(
             epoch,
@@ -143,9 +132,9 @@ def train(model, train_dataloader, optimizer, epoch, writer, device_num, logger)
             correct,
             len(train_dataloader.dataset),
             mean_accuracy)
-    )  # 打印轮数、分类器损失和准确率信息
+    )  
     writer.add_scalar('Accuracy/train', 100.0 * correct / len(train_dataloader.dataset), epoch)
-    writer.add_scalar('Loss/train', mean_loss, epoch)  # 用于训练准确率和分类器损失的可视化
+    writer.add_scalar('Loss/train', mean_loss, epoch)
     return mean_loss, mean_accuracy
 
 def evaluate(model, loss, val_dataloader, epoch, writer, device_num, logger):
@@ -179,24 +168,21 @@ def evaluate(model, loss, val_dataloader, epoch, writer, device_num, logger):
     accuracy = 100.0 * correct / len(val_dataloader.dataset)
     writer.add_scalar('Accuracy/validation', accuracy, epoch)
     writer.add_scalar('Loss/validation', val_loss, epoch)
-
     return val_loss, mean_accuracy
-
-
 def test(model, test_dataloader, logger):
     model.eval()
     correct = 0
-    total_max_values_correct = 0  # 累加正确分类样本的最大概率值
-    total_correct_samples = 0  # 计数正确分类的样本数量
+    total_max_values_correct = 0 
+    total_correct_samples = 0 
     total_max_values = 0
     total_samples = 0
-    total_max_values_wrong = 0  # 累加错误分类样本的最大概率值
-    total_wrong_samples = 0  # 计数错误分类的样本数量
+    total_max_values_wrong = 0 
+    total_wrong_samples = 0 
     features_list = []
     labels_list = []
     target_pred = []
     target_real = []
-    probabilities_list = []  # 用于存储所有概率
+    probabilities_list = []  
     t = 0
     i = 0
     with torch.no_grad():
@@ -209,23 +195,18 @@ def test(model, test_dataloader, logger):
             features, output = model(data)
             out = F.log_softmax(output, dim=1)
             max_values, max_indices = torch.max(out, dim=1)
-            total_max_values += max_values.sum().item()  # 累加每个batch的max_values总和
-            total_samples += data.size(0)  # 累加样本数量
-
-            pred = output.argmax(dim=1, keepdim=True)  # 预测结果
-            correct_mask = pred.eq(target.view_as(pred))  # 创建一个正确分类的掩码
+            total_max_values += max_values.sum().item() 
+            total_samples += data.size(0)
+            pred = output.argmax(dim=1, keepdim=True)
+            correct_mask = pred.eq(target.view_as(pred)) 
             correct += correct_mask.sum().item()
-
-            max_values_correct = max_values[correct_mask.squeeze()]  # 选择正确分类的样本的最大概率值
-            total_max_values_correct += max_values_correct.sum().item()  # 累加这些概率值
-            total_correct_samples += correct_mask.sum().item()  # 累加正确分类的样本数
-
-            # 错误分类的处理
-            incorrect_mask = ~correct_mask.squeeze()  # 错误分类的掩码
-            max_values_wrong = max_values[incorrect_mask]  # 选择错误分类的样本的最大概率值
-            total_max_values_wrong += max_values_wrong.sum().item()  # 累加这些概率值
-            total_wrong_samples += incorrect_mask.sum().item()  # 累加错误分类的样本数
-
+            max_values_correct = max_values[correct_mask.squeeze()] 
+            total_max_values_correct += max_values_correct.sum().item()  
+            total_correct_samples += correct_mask.sum().item()  
+            incorrect_mask = ~correct_mask.squeeze()  
+            max_values_wrong = max_values[incorrect_mask]
+            total_max_values_wrong += max_values_wrong.sum().item()
+            total_wrong_samples += incorrect_mask.sum().item() 
             end_time = time.time()
             elapsed_time = end_time - start_time
             t += elapsed_time
@@ -235,7 +216,6 @@ def test(model, test_dataloader, logger):
             target_pred.extend(pred.view(-1).tolist())
             target_real.extend(target.view(-1).tolist())
             probabilities_list.append(out.cpu().numpy())
-
         t /= i
         #logger.info("Average processing time per batch:", t)
         target_pred = np.array(target_pred)
@@ -261,7 +241,7 @@ def train_and_evaluate(model, loss_function, train_dataloader, val_dataloader, o
     train_accies = []
     val_losses = []
     val_accies = []
-    current_max_val_accuracy = 1  # 初始化当前最小的测试损失为一个较大的值，判断模型是否有改进
+    current_max_val_accuracy = 1 
     time_start1 = time.time()
     for epoch in range(1, epochs + 1):
         time_start = time.time()
@@ -282,28 +262,23 @@ def train_and_evaluate(model, loss_function, train_dataloader, val_dataloader, o
         time_sum = time_end - time_start
         logger.info("time for each epoch is: %s" % time_sum)
         logger.info("------------------------------------------------")
-        torch.cuda.empty_cache()  # 每轮训练结束清空未使用的显存
+        torch.cuda.empty_cache()  
     time_end1 = time.time()
     Ave_epoch_time = (time_end1 - time_start1) / epochs
     logger.info("Avgtime for each epoch is: %s" % Ave_epoch_time)
     return train_losses, train_accies, val_losses, val_accies
-
-
 class MultiFileBatchSampler(BatchSampler):
     def __init__(self, file_indices, batch_size_per_file):
-        self.file_indices = file_indices  # 每个文件的数据索引
-        self.batch_size_per_file = batch_size_per_file  # 每个文件的batch size
+        self.file_indices = file_indices
+        self.batch_size_per_file = batch_size_per_file 
         self.num_files = len(file_indices)
-
     def __iter__(self):
-        # 计算每个文件的样本总数
         num_samples_per_file = len(self.file_indices[0])
         num_batches = num_samples_per_file // self.batch_size_per_file
 
         for batch_idx in range(num_batches):
             batch = []
             for file_index in self.file_indices:
-                # 从每个文件按顺序取出 batch_size_per_file 个数据
                 start_idx = batch_idx * self.batch_size_per_file
                 end_idx = start_idx + self.batch_size_per_file
                 batch.extend(file_index[start_idx:end_idx])
@@ -312,72 +287,53 @@ class MultiFileBatchSampler(BatchSampler):
     def __len__(self):
         num_samples_per_file = len(self.file_indices[0])
         return (num_samples_per_file // self.batch_size_per_file) * self.num_files
-
-
 if __name__ == '__main__':
-    conf = Config()  # 创建一个配置对象，存储各种配置参数
+    conf = Config()  
     writer = SummaryWriter("logs")
-
     device = torch.device("cuda:" + str(conf.device_num))
     RANDOM_SEED = 300  # any random number
     set_seed(RANDOM_SEED)
-
     X_train_all, Y_train_all, L_train_all = [], [], []
     X_val_all, Y_val_all, L_val_all = [], [], []
-
     file_paths = [f'D:/work/data/paper6data/day1equalized/IQ/200/Rx{i}.npy' for i in range(1, 11)]
     for i, file_path in enumerate(file_paths):
         X_train, X_val, Y_train, Y_val, L_train, L_val = read_train_data(file_path, file_label=i)
         X_train_all.append(X_train)
         Y_train_all.append(Y_train)
         L_train_all.append(L_train)
-
         X_val_all.append(X_val)
         Y_val_all.append(Y_val)
         L_val_all.append(L_val)
-
     X_train_all = np.concatenate(X_train_all, axis=0)
     Y_train_all = np.concatenate(Y_train_all, axis=0)
     L_train_all = np.concatenate(L_train_all, axis=0)
-
     X_val_all = np.concatenate(X_val_all, axis=0)
     Y_val_all = np.concatenate(Y_val_all, axis=0)
     L_val_all = np.concatenate(L_val_all, axis=0)
-
-    # 将数据转换为PyTorch张量，包含：数据、标签和文件标签
     train_dataset = TensorDataset(torch.Tensor(X_train_all), torch.Tensor(Y_train_all), torch.Tensor(L_train_all))
     val_dataset = TensorDataset(torch.Tensor(X_val_all), torch.Tensor(Y_val_all), torch.Tensor(L_val_all))
-
     file_indices = []
-    file_size = len(X_train_all) // 10 # 假设每个文件的数据量相同
+    file_size = len(X_train_all) // 10
     for i in range(10):
         file_indices.append(list(range(i * file_size, (i + 1) * file_size)))
-    batch_size_per_file = conf.batch_size  # 每个文件取32个数据
+    batch_size_per_file = conf.batch_size
     batch_sampler = MultiFileBatchSampler(file_indices, batch_size_per_file)
-
-    # train_dataloader = DataLoader(train_dataset, batch_size=conf.batch_size, shuffle=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=conf.batch_size, shuffle=True)
     train_dataloader = DataLoader(train_dataset, batch_sampler=batch_sampler)
     val_dataloader = DataLoader(val_dataset, batch_size=conf.batch_size, shuffle=True)
-
     conf = parse_args()
     lam = conf.lam
     beta = conf.beta
-
     save_dir = f"tsne/"
-    #ManyRx_111_1218是Mask后的，ManyRx_111_12181是原始的
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-
     file_name = f'lam={conf.lam}_{conf.beta}_{timestape}'
     logger = setup_logger(save_dir, file_name)
     logger.info("Training session starts")
     logger.info(f"Configuration: {conf}")
     modelweightfile = os.path.join(save_dir, f'{file_name}.pth')
-
-
     model = my_resnet()
     logger.info(model)
-
     if torch.cuda.is_available():
         model = model.to(device)
     loss = nn.CrossEntropyLoss()
@@ -391,7 +347,6 @@ if __name__ == '__main__':
     time_end = time.time()
     time_sum = time_end - time_start
     logger.info("total training time is: %s" % time_sum)
-
     X_test, Y_test, = read_test_data()
     test_dataset = TensorDataset(torch.Tensor(X_test), torch.Tensor(Y_test))
     data = torch.tensor(X_test)
@@ -407,24 +362,17 @@ if __name__ == '__main__':
     features_2d = tsne.fit_transform(features_reshaped)
     plt.rc('font', family='Times New Roman')
     plt.rcParams['axes.unicode_minus'] = False
-    plt.rcParams['xtick.labelsize'] = 16  # 设置 x 轴刻度标签字体大小
-    plt.rcParams['ytick.labelsize'] = 16  # 设置 y 轴刻度标签字体大小
-
-    #colors = ['#427AB2', '#F09148', '#E56F5E', '#B395BD', '#C59D94', '#7DAEE0']
-    #colors = ['#96C3D8', '#67A59B', '#A5D38F', '#f0d89a', '#F5B375', '#F19294']
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
-
+    plt.rcParams['xtick.labelsize'] = 16  
+    plt.rcParams['ytick.labelsize'] = 16 
     cmap = ListedColormap(colors)
-    # 绘制颜色条
-    # 绘制 t-SNE 散点图
     fig, ax = plt.subplots(figsize=(10, 8))
     scatter = ax.scatter(features_2d[:, 0], features_2d[:, 1], c=labels, cmap=cmap)
-    # 添加颜色条
     cbar = fig.colorbar(scatter, orientation='vertical', ticks=np.arange(6))
     cbar.set_ticklabels([f'TX{i + 1}' for i in range(6)])
     cbar.ax.tick_params(labelsize=16)
     plt.savefig("D:/work/after.pdf", format='pdf', bbox_inches='tight')
     plt.show()
+
 
 
 
