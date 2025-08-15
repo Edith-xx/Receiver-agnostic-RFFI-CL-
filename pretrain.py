@@ -11,17 +11,15 @@ from data_loader import *
 import random
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed) # CPU
     torch.cuda.manual_seed(seed) # GPU
     torch.cuda.manual_seed_all(seed) # All GPU
-    os.environ['PYTHONHASHSEED'] = str(seed) #设置pytorch内置hash函数种子，保证不同运行环境下字典等数据结构的哈希结果一致
-    torch.backends.cudnn.deterministic = True # 确保每次返回的卷积算法是确定的
-    torch.backends.cudnn.benchmark = False # True的话会自动寻找最适合当前配置的高效算法，来达到优化运行效率的问题。False禁用
-
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.backends.cudnn.deterministic = True 
+    torch.backends.cudnn.benchmark = False 
 class Config:
     def __init__(
         self,
@@ -42,13 +40,11 @@ class Config:
         self.rand_num = rand_num
         self.train_lossses = []
         self.val_accuracies = []
-
 def train(model, train_dataloader, optimizer, epoch, writer, device_num):
     model.train()
     device = torch.device("cuda:"+str(device_num))
     correct = 0
     classifier_loss =0
-
     for data_nnl in train_dataloader:
         data, target = data_nnl
         real_part = data[:, 0, :]
@@ -57,7 +53,6 @@ def train(model, train_dataloader, optimizer, epoch, writer, device_num):
         data = torch.angle(torch.fft.fft(complex_data, dim=(1)))
         data = data.unsqueeze(1)
         target = target.squeeze().long()
-
         if torch.cuda.is_available():
             data = data.to(device)
             target = target.to(device)
@@ -71,8 +66,8 @@ def train(model, train_dataloader, optimizer, epoch, writer, device_num):
         classifier_loss += classifier_loss_batch.item()
         pred = classifier_output.argmax(dim=1, keepdim=True)
         correct += pred.eq(target.view_as(pred)).sum().item()
-    mean_loss = classifier_loss / len(train_dataloader)  # len(t1)表示t1数据集的批次数量
-    mean_accuracy = 100 * correct / len(train_dataloader.dataset)  # 所有样本中预测正确的数量除以总的样本个数
+    mean_loss = classifier_loss / len(train_dataloader) 
+    mean_accuracy = 100 * correct / len(train_dataloader.dataset)
     print(
         'Train Epoch: {} \tLoss: {:.6f}, Accuracy: {}/{} ({:0f}%)\n'.format(
             epoch,
@@ -80,11 +75,10 @@ def train(model, train_dataloader, optimizer, epoch, writer, device_num):
             correct,
             len(train_dataloader.dataset),
             mean_accuracy)
-        )                                                                 #打印轮数、分类器损失和准确率信息
+        )                       
     writer.add_scalar('Accuracy/train', 100.0 * correct / len(train_dataloader.dataset), epoch)
-    writer.add_scalar('Loss/train', classifier_loss, epoch) #用于训练准确率和分类器损失的可视化
+    writer.add_scalar('Loss/train', classifier_loss, epoch)
     return mean_loss, mean_accuracy
-
 def evaluate(model, loss, val_dataloader, epoch, writer, device_num):
     model.eval()
     val_loss = 0
@@ -106,7 +100,6 @@ def evaluate(model, loss, val_dataloader, epoch, writer, device_num):
             val_loss += loss(output, target).item()
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
-
     val_loss /= len(val_dataloader)
     mean_accuracy = 100*correct/len(val_dataloader.dataset)
     fmt = '\nValidation set: loss: {:.4f}, Accuracy: {}/{} ({:0f}%)\n'
@@ -121,15 +114,13 @@ def evaluate(model, loss, val_dataloader, epoch, writer, device_num):
     accuracy = 100.0 * correct / len(val_dataloader.dataset)
     writer.add_scalar('Accuracy/validation', accuracy, epoch)
     writer.add_scalar('Loss/validation', val_loss, epoch)
-
     return val_loss, mean_accuracy
-
 def train_and_evaluate(model, loss_function, train_dataloader, val_dataloader, optimizer, epochs, writer, save_path, device_num):
     train_losses = []
     train_accies = []
     val_losses = []
     val_accies = []
-    current_max_val_accuracy = 0                 #初始化当前最小的测试损失为一个较大的值，判断模型是否有改进
+    current_max_val_accuracy = 0                 
     time_start1 = time.time()
     for epoch in range(1, epochs + 1):
         time_start = time.time()
@@ -151,14 +142,13 @@ def train_and_evaluate(model, loss_function, train_dataloader, val_dataloader, o
         time_sum = time_end - time_start
         print("time for each epoch is: %s" % time_sum)
         print("------------------------------------------------")
-        torch.cuda.empty_cache()#每轮训练结束清空未使用的显存
+        torch.cuda.empty_cache()
     time_end1 = time.time()
     Ave_epoch_time = (time_end1 - time_start1) / epochs
     print("Avgtime for each epoch is: %s" % Ave_epoch_time)
     return train_losses, train_accies, val_losses, val_accies
-
 if __name__ == '__main__':
-    conf = Config()                                                      #创建一个配置对象，存储各种配置参数
+    conf = Config()                                                     
     writer = SummaryWriter("logs")
     device = torch.device("cuda:"+str(conf.device_num))
     RANDOM_SEED = 300  # any random number
@@ -176,12 +166,10 @@ if __name__ == '__main__':
             Y_train_all.append(Y_train)
             X_val_all.append(X_val)
             Y_val_all.append(Y_val)
-
         X_train_all = np.concatenate(X_train_all, axis=0)
         Y_train_all = np.concatenate(Y_train_all, axis=0)
         X_val_all = np.concatenate(X_val_all, axis=0)
         Y_val_all = np.concatenate(Y_val_all, axis=0)
-
         train_dataset = TensorDataset(torch.Tensor(X_train_all), torch.Tensor(Y_train_all))
         val_dataset = TensorDataset(torch.Tensor(X_val_all), torch.Tensor(Y_val_all))
         train_dataloader = DataLoader(train_dataset, batch_size=conf.batch_size, shuffle=True, num_workers=2, pin_memory=True)
