@@ -5,10 +5,6 @@
 > *IEEE Communications Letters*, vol. 29, no. 10, pp. 2396–2400, Oct. 2025  
 > DOI: [10.1109/LCOMM.2025.3598034](https://doi.org/10.1109/LCOMM.2025.3598034)
 
-[![Paper](https://img.shields.io/badge/Paper-IEEE%20Communications%20Letters-blue.svg)](https://doi.org/10.1109/LCOMM.2025.3598034)
-[![Framework](https://img.shields.io/badge/Framework-PyTorch-ee4c2c.svg)](https://pytorch.org/)
-[![Dataset](https://img.shields.io/badge/Dataset-WiSig-2f7ed8.svg)](https://cores.ee.ucla.edu/downloads/datasets/wisig/)
-[![License](https://img.shields.io/badge/License-Non--Commercial-red.svg)](#license)
 
 ---
 
@@ -22,59 +18,6 @@ This work proposes a **receiver-agnostic RFF framework** that learns domain-inva
 2. **Cross-domain invariant feature learning:** A correlation-alignment objective minimizes discrepancies in the first- and second-order statistics of features collected by different training receivers.
 ---
 
-## Method
-
-### Fourier Phase-Driven Knowledge Distillation
-
-For a complex I/Q sequence `x(n)`, the Fourier transform and phase are computed as
-
-```text
-F(k) = FFT{x(n)},
-phase(k) = angle(F(k)).
-```
-
-The phase sequence is used to train the teacher CNN. During student training, the intra-domain feature component is guided by the teacher through
-
-```text
-L_IDIFE = MSE(F_teacher, F1).
-```
-
-### Cross-Domain Correlation Alignment
-
-For cross-domain feature subsets `C_i` and `C_j` sampled from two receivers, the framework aligns their means and covariance matrices:
-
-```text
-L_CDIFE = (1 / d)   ||mu_i - mu_j||_2^2
-         + (1 / d²) ||Sigma_i - Sigma_j||_F².
-```
-
-The complete training objective is
-
-```text
-L_total = L_CE + lambda * L_IDIFE + beta * L_CDIFE,
-```
-
-where `L_CE` is the device-classification loss, while `lambda` and `beta` control the two invariant-feature objectives.
-
----
-
-## Repository Structure
-
-```text
-Receiver-agnostic-RFFI-CL-/
-├── Network1.py             # Student complex-valued CNN
-├── teacherNet.py           # Phase-based teacher CNN
-├── complex.py              # Complex-valued 1-D convolution implementation
-├── pretrain.py             # Teacher-network pre-training
-├── train_DIFEX1.py         # Student training, validation, testing, and t-SNE
-├── data_loader.py          # WiSig loading, normalization, masking, and AWGN utilities
-├── confusion_matrix.py     # Confusion-matrix evaluation and visualization
-├── mmd_loss.py             # Auxiliary distribution-discrepancy utilities
-├── run_DIFEX.sh            # Grid search over lambda and beta
-├── Receiver_agnostic.zip   # Packaged code archive
-├── output.log              # Example output log
-└── README.md
-```
 
 ## Dataset
 
@@ -95,18 +38,6 @@ The experimental configuration contains:
 | Device classes | 6 |
 
 Use the **equalized 256-sample identification signals**, because the paper applies WiFi-preamble equalization before model training. Each receiver must belong exclusively to either the training set or the test set; receiver overlap between the two sets is not allowed.
-
-A convenient processed layout is
-
-```text
-data/
-└── wisig_equalized/
-    ├── Rx1.npy
-    ├── Rx2.npy
-    ├── ...
-    ├── Rx12.npy
-    └── labels.npy
-```
 
 ## Experimental Protocol
 
@@ -150,18 +81,6 @@ Identification accuracy (%) for different allocations of `F1` and `F2`:
 | 0% | 100% | 76.01 | 85.77 | 88.33 | 91.17 | 84.06 | 91.17 | 86.09 |
 
 The balanced `50%:50%` allocation performs best in every reported receiver configuration. It reaches **93.13%** accuracy for `R=9:3` and an average accuracy of **89.18%** across all six settings.
-
-### Robustness
-
-The paper evaluates two deployment-oriented disturbances:
-
-- **AWGN:** SNR levels from 20 dB to 0 dB;
-- **Partial signal loss:** random input masking ratios from 5% to 25%.
-
-Accuracy decreases as noise intensity or mask ratio increases. Nevertheless, the model remains above 80% accuracy for every receiver configuration at a 25% mask ratio, and exceeds 85% for `R=9:3`. The results also show that greater diversity among training receivers improves robustness to both noise and missing samples.
-
----
-
 
 ## Citation
 
