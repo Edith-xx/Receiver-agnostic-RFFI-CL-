@@ -127,4 +127,8 @@ The WiSig dataset is distributed under its own license. Users must comply with t
 
 ## Contact
 
-For questions about the paper or code, please contact the authors through the email addresses listed in the paper.
+For questions about the paper, please contact the author:
+
+- Zhenxin Cai: `652022230002@smail.nju.edu.cn`
+
+---
